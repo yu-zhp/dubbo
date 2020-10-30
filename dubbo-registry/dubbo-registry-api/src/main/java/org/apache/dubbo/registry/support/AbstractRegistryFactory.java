@@ -42,7 +42,7 @@ import static org.apache.dubbo.rpc.cluster.Constants.EXPORT_KEY;
 import static org.apache.dubbo.rpc.cluster.Constants.REFER_KEY;
 
 /**
- * AbstractRegistryFactory. (SPI, Singleton, ThreadSafe)
+ * AbstractRegistryFactory. (SPI, Singleton, ThreadSafe) 支持spi，单例，线程安全
  *
  * @see org.apache.dubbo.registry.RegistryFactory
  */
@@ -72,6 +72,11 @@ public abstract class AbstractRegistryFactory implements RegistryFactory {
         return REGISTRIES.get(key);
     }
 
+    /**
+     * 筛选所有服务发现的注册器
+     * 获取所有的 ServiceDiscovery 对象
+     * @return
+     */
     public static List<ServiceDiscovery> getServiceDiscoveries() {
         return AbstractRegistryFactory.getRegistries()
                 .stream()
@@ -83,6 +88,8 @@ public abstract class AbstractRegistryFactory implements RegistryFactory {
 
     /**
      * Close all created registries
+     *
+     * 关闭所有已经创建的注册器
      */
     public static void destroyAll() {
         if (!destroyed.compareAndSet(false, true)) {
@@ -109,6 +116,11 @@ public abstract class AbstractRegistryFactory implements RegistryFactory {
         }
     }
 
+    /**
+     * 工厂方法获取 Registry 的默认实现
+     * @param url Registry address, is not allowed to be empty
+     * @return
+     */
     @Override
     public Registry getRegistry(URL url) {
         if (destroyed.get()) {
@@ -124,17 +136,22 @@ public abstract class AbstractRegistryFactory implements RegistryFactory {
                 .build();
         String key = createRegistryCacheKey(url);
         // Lock the registry access process to ensure a single instance of the registry
+        // 锁住注册器访问的过程确保注册器只被实例化一次,单例
         LOCK.lock();
         try {
             Registry registry = REGISTRIES.get(key);
+            //返回已经缓存的注册器
             if (registry != null) {
                 return registry;
             }
             //create registry by spi/ioc
+            //通过spi/ioc创建注册器
             registry = createRegistry(url);
+            //如果创建完还是空，那么久抛异常
             if (registry == null) {
                 throw new IllegalStateException("Can not create registry " + url);
             }
+            //将创建好的注册器放入缓存
             REGISTRIES.put(key, registry);
             return registry;
         } finally {
@@ -147,6 +164,9 @@ public abstract class AbstractRegistryFactory implements RegistryFactory {
      * Create the key for the registries cache.
      * This method may be override by the sub-class.
      *
+     * 创建注册器的缓存键（key）
+     * 此方法可以由子类覆盖
+     *
      * @param url the registration {@link URL url}
      * @return non-null
      */
@@ -156,7 +176,10 @@ public abstract class AbstractRegistryFactory implements RegistryFactory {
 
     protected abstract Registry createRegistry(URL url);
 
-
+    /**
+     * 没有找到注册器的时候，会有一个默认的注册器实现，防止空指针异常
+     * 将会不注册到任何的注册中心
+     */
     private static Registry DEFAULT_NOP_REGISTRY = new Registry() {
         @Override
         public URL getUrl() {
@@ -199,6 +222,10 @@ public abstract class AbstractRegistryFactory implements RegistryFactory {
         }
     };
 
+    /**
+     * 从缓存中去除已经销毁的注册器
+     * @param toRm
+     */
     public static void removeDestroyedRegistry(Registry toRm) {
         LOCK.lock();
         try {
@@ -209,6 +236,9 @@ public abstract class AbstractRegistryFactory implements RegistryFactory {
     }
 
     // for unit test
+    /**
+     * 注释说是测试用的，清除所有的注册器缓存
+     */
     public static void clearRegistryNotDestroy() {
         REGISTRIES.clear();
     }
